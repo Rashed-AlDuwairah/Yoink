@@ -30,25 +30,43 @@ function App(): React.JSX.Element {
 
     try {
       // 1. Get video URL from Cobalt API
-      const cobaltApi = 'https://api.cobalt.tools/api/json';
+      const cobaltApi = 'https://api.cobalt.tools/';
       const response = await fetch(cobaltApi, {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url: url }),
+        body: JSON.stringify({
+          url: url,
+        }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch from Cobalt API');
+        let errorMsg = 'Failed to fetch from Cobalt API';
+        try {
+          const errorJson = await response.json();
+          if (errorJson.text) errorMsg = errorJson.text;
+        } catch (e) { }
+        throw new Error(errorMsg);
       }
 
       const result = await response.json();
-      const videoUrl = result.url;
+
+      let videoUrl = '';
+      if (result.status === 'tunnel' || result.status === 'redirect') {
+        videoUrl = result.url;
+      } else if (result.status === 'picker') {
+        // for simplicity, if it's a picker (like a gallery), just take the first item's url
+        if (result.picker && result.picker.length > 0) {
+          videoUrl = result.picker[0].url;
+        } else {
+          throw new Error('No media found in the provided link.');
+        }
+      }
 
       if (!videoUrl) {
-        throw new Error('Could not find video URL in response');
+        throw new Error('Could not find a valid video URL in the response.');
       }
 
       // 2. Download video to local storage
