@@ -1,0 +1,56 @@
+name: Build Unsigned iOS App
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          
+      - name: Install npm dependencies
+        run: npm install
+          
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install
+          
+      - name: Build iOS App (Unsigned)
+        run: |
+          cd ios
+          xcodebuild -workspace Yoink.xcworkspace \
+            -scheme Yoink \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath ./build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+            
+      - name: Create IPA
+        run: |
+          mkdir -p Payload
+          # Find the .app folder output by xcodebuild and move it to Payload
+          mv ios/build/Build/Products/Release-iphoneos/Yoink.app Payload/
+          zip -r Yoink.ipa Payload
+          
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Yoink-Unsigned-IPA
+          path: Yoink.ipa
+          retention-days: 7
